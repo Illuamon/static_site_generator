@@ -4,15 +4,20 @@ from markdown_to_html_node import markdown_to_html_node
 
 import os
 import shutil
+import sys
 
 def main():
-    copy_files("./static", "./public")
-    generate_pages_recursive("content", "template.html", "public")
-
+    copy_files("static", "docs")
+    basepath = sys.argv[1]
+    if not basepath:
+        basepath = "/"
+    generate_pages_recursive("content", "template.html", "docs", basepath)
+    
 
 def copy_files(source, destination):
-    if os.path.exists(destination) and os.path.exists(source):
-        shutil.rmtree(destination)
+    if os.path.exists(source):
+        if os.path.exists(destination):
+            shutil.rmtree(destination)
         os.mkdir(destination)
         files_in_src = os.listdir(source)
         for file in files_in_src:
@@ -25,6 +30,8 @@ def copy_files(source, destination):
                 new_src = os.path.join(source, file)
                 os.mkdir(new_dest)
                 copy_files(new_src, new_dest)
+    else:
+        raise Exception("source path does not exist")
 
 def extract_title(markdown):
     blocks = markdown_to_blocks(markdown)
@@ -36,7 +43,7 @@ def extract_title(markdown):
                 return title.strip()
     raise Exception("no h1 header")
 
-def generate_page(from_path, template_path, dest_path):
+def generate_page(from_path, template_path, dest_path, basepath):
     print(f"Generating page from {from_path} to {dest_path} using {template_path}")
     if os.path.exists(from_path) and os.path.exists(template_path):
         with open(from_path, 'r') as f:
@@ -51,6 +58,9 @@ def generate_page(from_path, template_path, dest_path):
         w_title = template.replace("{{ Title }}", title)
         full_html = w_title.replace("{{ Content }}", content)
 
+        full_html = full_html.replace('href="/', f'href="{basepath}')
+        full_html = full_html.replace('src="', f'src="{basepath}')
+
         if os.path.exists(os.path.dirname(dest_path)):
             with open(dest_path, 'w') as f:
                 f.write(full_html)
@@ -63,7 +73,7 @@ def generate_page(from_path, template_path, dest_path):
     else:
         raise Exception("from path, template or both dont exist")
 
-def generate_pages_recursive(dir_path_content, template_path, dest_dir_path):
+def generate_pages_recursive(dir_path_content, template_path, dest_dir_path, basepath):
     if os.path.exists(dir_path_content) and os.path.exists(template_path):
         if not os.path.exists(dest_dir_path):
             os.makedirs(dest_dir_path)
@@ -73,11 +83,11 @@ def generate_pages_recursive(dir_path_content, template_path, dest_dir_path):
             if os.path.exists(item_path) and item_path.endswith(".md"):
                 #generate html
                 new_dest = os.path.join(dest_dir_path, item.replace(".md", ".html"))
-                generate_page(item_path, template_path, new_dest)
+                generate_page(item_path, template_path, new_dest, basepath)
             elif os.path.exists(item_path) and os.path.isdir(item_path):
                 new_dest = os.path.join(dest_dir_path, item)
                 print(f"going into dir {item_path}")
-                generate_pages_recursive(item_path, template_path, new_dest)
+                generate_pages_recursive(item_path, template_path, new_dest, basepath)
             else:
                 continue          
     else:
